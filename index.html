@@ -76,10 +76,9 @@
 
   <div id="ok" class="ok card">
     <div class="big">Odoslané ✓</div>
-    <p class="sub" style="margin:0 auto 4px">Otvorili sme ti pripravený e-mail pre CreAI tím — skontroluj a pošli.</p>
+    <p class="sub" style="margin:0 auto 4px">Požiadavka šla CreAI tímu — <b style="color:#fff">e-mail odoslaný + zapísané do Google Sheetu</b>.</p>
     <div class="summary" id="summary"></div>
     <button class="copybtn" id="copy">Skopírovať zhrnutie</button>
-    &nbsp;&nbsp;<a id="reopen" href="#">znova otvoriť e-mail</a>
     <p class="sub" style="margin:22px auto 0;font-size:16px"><a href="#" id="again">← zadať ďalšiu požiadavku</a></p>
   </div>
 
@@ -87,8 +86,8 @@
 </div>
 
 <script>
-  // Kam idú požiadavky — zmeň podľa potreby:
-  const TO = 'matej.astary@dexfinity.com';
+  // Endpoint = Google Apps Script web app (zapíše do Sheetu + pošle e-mail):
+  const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxUcFNpbxYFYXiM2Nd2MU77NiT43j4ONlRsUSaNoG_5-4jRLxSaFZyGKqKKG5qmIwwM/exec';
 
   const TOOLS = [
     {id:'Konkurenčná analýza', tag:'Platené · 400–500 €', cls:'paid'},
@@ -125,14 +124,11 @@
     const cli=document.getElementById('cli').value.trim();
     if(!acc||!cli){ alert('Vyplň prosím svoje meno aj klienta.'); return; }
     const s=buildSummary();
-    const subject='CreAI request: '+s.tool+' — '+cli;
-    lastMailto='mailto:'+encodeURIComponent(TO)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(s.text);
-    document.getElementById('summary').textContent=s.text;
-    f.style.display='none'; ok.classList.add('show');
-    window.location.href=lastMailto;
+    const btn=f.querySelector('.btn'); btn.disabled=true; btn.textContent='Odosielam…';
+    fetch(ENDPOINT,{method:'POST',mode:'no-cors',body:new URLSearchParams({acc:s.acc,cli:s.cli,tool:s.tool,note:s.note})})
+      .then(finish).catch(finish);
+    function finish(){ document.getElementById('summary').textContent=s.text; f.style.display='none'; ok.classList.add('show'); }
   });
-
-  document.getElementById('reopen').addEventListener('click',function(e){e.preventDefault(); if(lastMailto) window.location.href=lastMailto;});
   document.getElementById('copy').addEventListener('click',function(){
     const txt=document.getElementById('summary').textContent;
     navigator.clipboard && navigator.clipboard.writeText(txt);

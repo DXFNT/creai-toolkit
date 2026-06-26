@@ -40,6 +40,11 @@
   .tn{font-size:18px;font-weight:600;margin-bottom:6px;letter-spacing:-.2px}
   .tp{font-size:13.5px;font-weight:600;letter-spacing:.02em}
   .tp.free{color:var(--teal)} .tp.paid{color:var(--orange)} .tp.bundle{color:#5aabff}
+  .tier{display:flex;gap:6px;margin-top:11px}
+  .tierbtn{flex:1;text-align:center;font-size:12px;font-weight:600;letter-spacing:.01em;padding:7px 6px;border-radius:9px;border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.5);cursor:pointer;transition:all .12s;user-select:none}
+  .tierbtn:hover{color:rgba(255,255,255,.85)}
+  .tierbtn.on.free{color:var(--teal);background:rgba(22,171,139,.16);border-color:rgba(22,171,139,.55)}
+  .tierbtn.on.paid{color:var(--orange);background:rgba(255,127,0,.14);border-color:rgba(255,127,0,.55)}
   .btn{margin-top:30px;width:100%;background:var(--blue);border:none;border-radius:13px;padding:18px;color:#fff;font-family:'Poppins';font-size:19px;font-weight:600;cursor:pointer;transition:background .15s}
   .btn:hover{background:#1f78ff}
   .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -89,21 +94,33 @@
   // Endpoint = Google Apps Script web app (zapíše do Sheetu + pošle e-mail):
   const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxUcFNpbxYFYXiM2Nd2MU77NiT43j4ONlRsUSaNoG_5-4jRLxSaFZyGKqKKG5qmIwwM/exec';
 
+  // 2 tiery na každý nástroj; def = predvolený (0 = Showcase/ukážka, 1 = Platené)
+  const TIERS = [{t:'Showcase / ukážka', cls:'free'}, {t:'Platené', cls:'paid'}];
   const TOOLS = [
-    {id:'Konkurenčná analýza', tag:'Platené · 400–500 €', cls:'paid'},
-    {id:'Retention audit',     tag:'Setup 1 900 € + 700 €/mes', cls:'paid'},
-    {id:'Ads audit',           tag:'Zadarmo · opener', cls:'free'},
-    {id:'Creative audit',      tag:'Zadarmo · opener', cls:'free'},
-    {id:'Kreatíva — produkcia',tag:'Platené', cls:'paid'},
-    {id:'Reporty',             tag:'V retaineri', cls:'bundle'},
+    {id:'Konkurenčná analýza',  def:0},
+    {id:'Retention audit',      def:0},
+    {id:'Ads audit',            def:0},
+    {id:'Creative audit',       def:0},
+    {id:'Kreatíva — produkcia', def:1},
+    {id:'Reporty',              def:1},
   ];
 
   const toolsEl = document.getElementById('tools');
   TOOLS.forEach((t,i)=>{
     const l=document.createElement('label'); l.className='tool';
+    const tiers=TIERS.map((tr,ti)=>'<span class="tierbtn '+tr.cls+(ti===t.def?' on':'')+'" data-tier="'+tr.t+'">'+tr.t+'</span>').join('');
     l.innerHTML='<input type="radio" name="tool" value="'+t.id+'"'+(i===0?' checked':'')+'>'+
-      '<div class="box"><div class="tn">'+t.id+'</div><div class="tp '+t.cls+'">'+t.tag+'</div></div>';
+      '<div class="box"><div class="tn">'+t.id+'</div><div class="tier">'+tiers+'</div></div>';
     toolsEl.appendChild(l);
+  });
+
+  // tier prepínač: klik na pill nastaví tier + zároveň vyberie nástroj
+  toolsEl.querySelectorAll('.tierbtn').forEach(function(b){
+    b.addEventListener('click',function(){
+      b.parentNode.querySelectorAll('.tierbtn').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      b.closest('.tool').querySelector('input').checked=true;
+    });
   });
 
   const f=document.getElementById('f'), ok=document.getElementById('ok');
@@ -112,10 +129,14 @@
   function buildSummary(){
     const acc=document.getElementById('acc').value.trim();
     const cli=document.getElementById('cli').value.trim();
-    const tool=(document.querySelector('input[name=tool]:checked')||{}).value||'';
+    const ti=document.querySelector('input[name=tool]:checked');
+    const tool=ti?ti.value:'';
+    const card=ti?ti.closest('.tool'):null;
+    const tierEl=card?card.querySelector('.tierbtn.on'):null;
+    const tier=tierEl?tierEl.getAttribute('data-tier'):'';
     const note=document.getElementById('note').value.trim();
-    return {acc,cli,tool,note,
-      text:'Account: '+acc+'\nKlient: '+cli+'\nNástroj: '+tool+(note?('\nPoznámka: '+note):'')+'\n\n— odoslané z CreAI toolkit (interný request)'};
+    return {acc,cli,tool,tier,note,
+      text:'Account: '+acc+'\nKlient: '+cli+'\nNástroj: '+tool+'\nTier: '+tier+(note?('\nPoznámka: '+note):'')+'\n\n— odoslané z CreAI toolkit (interný request)'};
   }
 
   f.addEventListener('submit',function(e){
@@ -125,7 +146,7 @@
     if(!acc||!cli){ alert('Vyplň prosím svoje meno aj klienta.'); return; }
     const s=buildSummary();
     const btn=f.querySelector('.btn'); btn.disabled=true; btn.textContent='Odosielam…';
-    fetch(ENDPOINT,{method:'POST',mode:'no-cors',body:new URLSearchParams({acc:s.acc,cli:s.cli,tool:s.tool,note:s.note})})
+    fetch(ENDPOINT,{method:'POST',mode:'no-cors',body:new URLSearchParams({acc:s.acc,cli:s.cli,tool:s.tool,tier:s.tier,note:s.note})})
       .then(finish).catch(finish);
     function finish(){ document.getElementById('summary').textContent=s.text; f.style.display='none'; ok.classList.add('show'); }
   });
